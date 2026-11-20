@@ -60,7 +60,7 @@ export function age(value) {
 }
 export function badge(value,tone) {
   const code=String(value).toUpperCase();
-  const inferred= /UNKNOWN|UNVERIFIED|BLOCKED|FAILED|QUARANTINED|ERROR|UNREACHABLE/.test(code)?'critical':/SIMULATED|WAIT|QUEUE|DRAIN|PREPAR/.test(code)?'amber':/SUCCE|COMPLETE|READY|ONLINE|RUNNING|AVAILABLE|VERIFIED/.test(code)?'green':'neutral';
+  const inferred= /UNKNOWN|UNVERIFIED|BLOCKED|FAILED|QUARANTINED|ERROR|UNREACHABLE/.test(code)?'critical':/SIMULATED|WAIT|QUEUE|DRAIN|PREPAR/.test(code)?'pending':/SUCCE|COMPLETE|READY|ONLINE|RUNNING|AVAILABLE|VERIFIED/.test(code)?'ready':'neutral';
   return `<span class="badge ${tone || inferred}"><i></i>${h(label(value))}</span>`;
 }
 export function link(route,content, cls='') {return `<a class="${cls}" href="#${h(route)}">${content}</a>`;}

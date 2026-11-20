@@ -32,7 +32,7 @@ function notice(text){
   el.textContent=text;el.classList.add('visible');
   clearTimeout(notice.timer);notice.timer=setTimeout(()=>el.classList.remove('visible'),4200);
 }
-function brand(){return '<div class="brand">'+mark+'<div><b>CIT GPU Hub</b><span>Compute console</span></div></div>';}
+function brand(){return '<div class="brand">'+mark+'<b>CIT GPU Hub</b></div>';}
 function navItem(route,title,active){
   return `<a href="#${route}" class="nav-item ${active===route?'current':''}" ${active===route?'aria-current="page"':''}>${icon(route,18)}<span>${h(title)}</span></a>`;
 }
@@ -43,7 +43,7 @@ function shell(kind){
   app.innerHTML=`<div class="shell"><aside id="sidebar"><div class="sidebar-inner">
       ${brand()}<nav aria-label="Workspace"><div class="nav-label">Workspace</div>${navItem('overview','Overview',active)}${navItem('queue','Job queue',active)}${navItem('projects','Projects',active)}${navItem('submit','Submit job',active)}
       ${user.role==='admin'?'<div class="nav-label second">Administration</div>'+navItem('admin','Node administration',active):''}</nav>
-      <div class="sidebar-bottom"><div class="connection"><i class="dot lime"></i><span>API connected</span></div>
+      <div class="sidebar-bottom"><div class="connection"><i class="dot ready"></i><span>API connected</span></div>
       <div class="identity"><span class="avatar">${h((user.alias||user.id).slice(0,1))}</span><div><b>${h(user.alias || user.id)}</b><small>${user.role==='admin'?'Administrator':'Student'}</small></div><button data-action="logout" title="Sign out" aria-label="Sign out">${icon('signout',15)}</button></div></div></div></aside>
       <div class="workspace"><header class="topbar"><div class="crumb"><button data-action="menu" class="menu-toggle" aria-controls="sidebar" aria-expanded="false" aria-label="Toggle navigation">${icon('menu',18)}</button><span class="crumb-home">Workspace</span>${icon('chevron',12)}<strong>${h(names[kind] || 'Page')}</strong></div>
       <div class="header-mode">${dev?'<span class="dev-mode">'+icon('lab',13)+'Development auth</span>':''}</div></header>
@@ -122,11 +122,11 @@ async function render(quiet=false){
     view.setAttribute('aria-busy','false');
     const after=view.querySelector('#job-logs');
     if(after)after.scrollTop=atEnd||offset===null?after.scrollHeight:offset;
-    const connection=document.querySelector('.connection');connection.innerHTML='<i class="dot lime"></i><span>API connected</span>';
+    const connection=document.querySelector('.connection');connection.innerHTML='<i class="dot ready"></i><span>API connected</span>';
   }catch(error){
     if(version!==state.revision)return;
     if(error.status===401){logout();login('Your session has expired. Sign in again.');return;}
-    if(quiet){document.querySelector('.connection').innerHTML='<i class="dot orange"></i><span>Update unavailable</span>';return;}
+    if(quiet){document.querySelector('.connection').innerHTML='<i class="dot critical"></i><span>Refresh failed</span>';return;}
     document.querySelector('#view').innerHTML='<div class="panel padded" role="alert"><h2>Couldn’t load this view</h2><p>'+h(messageOf(error))+'</p><button class="btn secondary" data-action="retry">Retry</button></div>';
   }
 }
@@ -176,7 +176,7 @@ app.addEventListener('submit',async event=>{
     if(form.dataset.policyUser){
       await saveStudentPolicy(form);
     }else if(form.id==='submit-job'){
-      const status=form.querySelector('#form-status');status.className='';status.textContent='Uploading revision and submitting…';await submitJob(form);
+      const status=form.querySelector('#form-status');status.className='';status.textContent='Submitting job…';await submitJob(form);
     }else{
       const values=new FormData(form);
       state.token=form.id==='dev-login'?(await request('/auth/dev',{method:'POST',body:{identity:values.get('identity')}})).token:values.get('token').trim();
@@ -197,14 +197,14 @@ app.addEventListener('click',async event=>{
   state.busy=true;button.disabled=true;
   try{
     if(action==='cancel'){
-      if(!confirm('Request checkpoint and stop this job?'))return;
+      if(!confirm('Stop this job? Progress after the last completed checkpoint may be lost.'))return;
       await request('/jobs/'+apiPath(route.id)+'/cancel',{method:'POST',body:{}});notice('Stop request recorded');
     }else if(action==='resume'){
       const r=await request('/jobs/'+apiPath(route.id)+'/resume',{method:'POST',body:{checkpoint_id:button.dataset.id},headers:{'Idempotency-Key':crypto.randomUUID()}});
       location.hash='job/'+url(r.id);notice('Resume requested');
     }else if(action==='drain'||action==='admit'){
       const verb=action==='drain'?'drain':'resume';
-      await request('/admin/nodes/'+apiPath(button.dataset.id)+'/'+verb,{method:'POST',body:{}});notice(action==='drain'?'Worker is draining':'Admissions resumed; qualification still required');
+      await request('/admin/nodes/'+apiPath(button.dataset.id)+'/'+verb,{method:'POST',body:{}});notice(action==='drain'?'Worker is draining':'Drain lifted. GPU jobs still require qualification.');
     }else if(action==='download'){
       const blob=await request('/artifacts/'+apiPath(button.dataset.id)+'/download',{blob:true});
       const local=URL.createObjectURL(blob);const a=document.createElement('a');a.href=local;a.download=button.dataset.filename;a.click();setTimeout(()=>URL.revokeObjectURL(local),30000);return;

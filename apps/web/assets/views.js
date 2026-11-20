@@ -1,17 +1,17 @@
 import {h,url,link,icon,badge,label,head,section,stats,table,empty,bytes,date,age,alias,profiles,pageLink} from './ui.js';
-import {queueTable,waitingJobs} from './overview.js';
+import {queueTable,waitingJobs,reason} from './overview.js';
 
 export function queuePage(jobs,state,query) {
   const q=query.trim().toLowerCase();
-  const filtered=(state==='waiting'?waitingJobs(jobs):jobs.filter(j=>state==='all'||j.state===state)).filter(j=>[j.name,j.alias,j.user_id,j.waiting_reason].some(v=>String(v||'').toLowerCase().includes(q)));
+  const filtered=(state==='waiting'?waitingJobs(jobs):jobs.filter(j=>state==='all'||j.state===state)).filter(j=>[j.name,j.alias,j.user_id,j.waiting_reason,j.waiting_reason && reason(j.waiting_reason)].some(v=>String(v||'').toLowerCase().includes(q)));
   const options=['waiting','all',...new Set(jobs.map(j=>j.state))];
-  return head('Job queue','Inspect queued work, reservations, and scheduling decisions.',link('submit',icon('plus',16)+'Submit job','btn primary'))+
+  return head('Job queue','',link('submit',icon('plus',16)+'Submit job','btn primary'))+
     `<div class="panel"><div class="toolbar"><label class="search-box">${icon('search',16)}<input type="search" id="queue-search" value="${h(query)}" placeholder="Find a job or student" aria-label="Find a job or student"></label>
     <select id="queue-state" aria-label="Filter by state">${options.map(v=>`<option value="${h(v)}" ${v===state?'selected':''}>${h(v==='waiting'?'Waiting jobs':v==='all'?'All states':label(v))}</option>`).join('')}</select></div>
     ${filtered.length?queueTable(filtered):empty(q?'No jobs match this search.':'No jobs match the selected state.')}</div>`;
 }
 export function projectsPage(projects,jobs) {
-  return head('Projects','Source revisions and run history in your workspace.',link('submit',icon('plus',16)+'Submit job','btn primary'))+
+  return head('Projects','',link('submit',icon('plus',16)+'Submit job','btn primary'))+
     section('Project directory','',projects.length)+'<div class="panel">'+
     table(['Project','Owner','Created'],projects.map(p=>[pageLink('project',p.id,p.name),h(p.alias||alias(p.owner_id||p.user_id)),h(date(p.created_at))]),'Submit a job to create your first project.')+'</div>'+
     section('Run history','',jobs.length)+'<div class="panel">'+historyTable(jobs)+'</div>';
@@ -22,27 +22,27 @@ function historyTable(jobs){
 export function projectPage(p,jobs){
   const revisions=p.revisions || [];
   const ids=new Set(revisions.map(r=>r.id));
-  return head(p.name,'Project history',link('submit?project='+url(p.id),icon('plus',16)+'Submit job','btn primary'))+
+  return head(p.name,'',link('submit?project='+url(p.id),icon('plus',16)+'Submit job','btn primary'))+
     section('Source revisions','',revisions.length)+'<div class="panel">'+table(['Revision','Entrypoint','Environment','Datasets','Digest','Created'],revisions.map(r=>[h(r.id),h(r.manifest?.entrypoint || 'Unavailable'),h(r.manifest?.environment || 'Unavailable'),h(r.manifest?.dataset_ids?.join(', ')||'None'),'<code title="'+h(r.source_hash||'')+'">'+h((r.source_hash || 'Unavailable').slice(0,16))+'</code>',h(date(r.created_at))]),'No source revisions uploaded.')+'</div>'+
     section('Run history')+'<div class="panel">'+historyTable(jobs.filter(j=>j.project_id===p.id||ids.has(j.revision_id)))+'</div>';
 }
 
 export function submitPage(projects,environments,datasets,selected,policy) {
   const runtimeLimit=policy.runtime_max_seconds;
-  return head('Submit a job','Upload an immutable source revision and choose its execution profile.')+
+  return head('Submit a job')+
     `<form id="submit-job" class="form-panel"><fieldset><legend>Source revision</legend>
     <div class="form-grid"><label>Project<select name="project_id"><option value="">Create a new project</option>${projects.map(p=>`<option value="${h(p.id)}" ${p.id===selected?'selected':''}>${h(p.name)}</option>`).join('')}</select></label>
     <label id="new-project-field" ${selected?'hidden':''}>New project name<input name="project_name" maxlength="80" ${selected?'':'required'} placeholder="e.g. Vision lab"></label>
     <label>Job name<input name="name" required maxlength="80" placeholder="e.g. Classifier baseline"></label>
     <label>Entrypoint<input name="entrypoint" required value="train.py"></label>
-    <label class="wide">Source file<input type="file" name="source" required accept=".py,.zip"><small>Upload a Python script or a ZIP containing the project.</small></label>
+    <label class="wide">Source file<input type="file" name="source" required accept=".py,.zip"><small>Choose a .py file or a .zip with the entrypoint inside.</small></label>
     </div></fieldset>
     <fieldset><legend>Execution</legend><div class="form-grid">
     <label>Environment<select name="environment" required>${environments.map(e=>`<option value="${h(e.id)}">${h(e.name || e.id)}</option>`).join('')}</select></label>
     <label>Profile<select name="profile">${Object.entries(profiles).map(([k,v])=>`<option value="${k}">${h(v)}</option>`).join('')}</select></label>
     <label>Maximum runtime (seconds)<input type="number" min="1" max="${h(runtimeLimit)}" step="1" name="runtime_seconds" required value="${Math.min(600,runtimeLimit)}"><small>Your runtime limit is ${h(runtimeLimit)} seconds per attempt.</small></label>
     <label>Dataset<select name="dataset_id"><option value="">No dataset</option>${datasets.map(d=>`<option value="${h(d.id)}">${h(d.name || d.id)}</option>`).join('')}</select></label></div>
-    <details><summary>Advanced manifest options</summary><div class="form-grid"><label class="wide">Arguments (JSON array)<textarea name="args" rows="2">[]</textarea></label>
+    <details><summary>Advanced options</summary><div class="form-grid"><label class="wide">Arguments (JSON array)<textarea name="args" rows="2">[]</textarea></label>
     <label>Output directory<input name="output_dir" value="outputs" required></label><label>Dependency lockfile (optional)<input name="dependencies_lock" placeholder="requirements.lock"></label>
     <label class="check wide"><input name="cooperative" type="checkbox"> Enable cooperative checkpoints</label></div></details></fieldset>
     <div id="form-status" role="status"></div><div class="form-actions">${link('overview','Cancel','btn secondary')}<button type="submit" class="btn primary">${icon('plus',16)}Submit job</button></div></form>`;
@@ -80,9 +80,9 @@ export function jobPage(j,logs,events,checkpoints,artifacts,viewer) {
   const mayControl=viewer.id===j.user_id || viewer.role==='admin';
   const cancel=terminal||!mayControl?'':`<button class="btn secondary" data-action="cancel" ${stop?'disabled':''}>${stop?'Stop requested':'Cancel job'}</button>`;
   return head(j.name,'Job '+j.id,cancel)+
-    `<div class="detail-banner">${badge(j.state)}<span>${h(j.waiting_reason?label(j.waiting_reason):profiles[j.profile]||label(j.profile))}</span></div>
-    <div class="detail-grid"><div class="panel padded"><h2>Allocation</h2>${stats([['Worker / slot',a?`${a.node_name} / ${a.slot}`:'Awaiting allocation'],['Profile',profiles[j.profile]||label(j.profile)],['Assigned GPU capacity',e.gpu_fraction==='1/2'?'50%'+(j.profile==='simulated'?' · simulated':''):e.gpu_fraction||'Unassigned'],['Host memory limit',bytes(e.memory_bytes)],['CPU-time quota',e.cpu_period_us?`${Number((e.cpu_quota_us/e.cpu_period_us).toFixed(2))} CPU equivalents`:'Unassigned'],['Soft warning / stop',e.warning_percent!=null?`${e.warning_percent}% / ${e.stop_percent}%`:'Unavailable'],['Runtime',j.manifest?.runtime_seconds?j.manifest.runtime_seconds+' s':'Unavailable'],['Absolute deadline',date(a?.deadline)]])}</div>
-    <div class="panel padded"><h2>Usage observations</h2>${stats(observationMetrics(a))}</div></div>
+    `<div class="detail-banner">${badge(j.state)}<span>${h(j.waiting_reason?reason(j.waiting_reason):profiles[j.profile]||label(j.profile))}</span></div>
+    <div class="detail-grid"><div class="panel padded"><h2>Allocation</h2>${stats([['Worker / slot',a?`${a.node_name} / ${a.slot}`:'Awaiting allocation'],['Profile',profiles[j.profile]||label(j.profile)],['Assigned GPU capacity',e.gpu_fraction==='1/2'?'50%'+(j.profile==='simulated'?' · simulated':''):e.gpu_fraction||'Unassigned'],['Host memory limit',bytes(e.memory_bytes)],['CPU-time quota',e.cpu_period_us?`${Number((e.cpu_quota_us/e.cpu_period_us).toFixed(2))} CPU equivalents`:'Unassigned'],['Memory warning / stop',e.warning_percent!=null?`${e.warning_percent}% / ${e.stop_percent}%`:'Unavailable'],['Time limit',j.manifest?.runtime_seconds?j.manifest.runtime_seconds+' s':'Unavailable'],['Deadline',date(a?.deadline)]])}</div>
+    <div class="panel padded"><h2>Resource usage</h2>${stats(observationMetrics(a))}</div></div>
     <section>${section('Execution logs','<span class="section-note">'+icon('terminal',15)+'Cursor '+h(logs.next_cursor || 0)+'</span>')}<pre id="job-logs" class="logs" tabindex="0">${h(logs.items.map(l=>l.message).join('\n') || 'No log output yet.')}</pre></section>
     <section>${section('Checkpoints','',checkpoints.length)}<div class="panel">${table(['Checkpoint','Size','Completed',''],checkpoints.map(c=>[h(c.name || c.id),h(bytes(c.size_bytes)),h(date(c.completed_at || c.created_at)),terminal&&mayControl?`<button class="btn small secondary" data-action="resume" data-id="${h(c.id)}">Resume</button>`:'']), 'No completed checkpoints.')}</div></section>
     <section>${section('Artifacts','',artifacts.length)}<div class="panel">${table(['File','Size',''],artifacts.map(f=>[h(f.name || f.id),h(bytes(f.size_bytes)),`<button class="btn small secondary" data-action="download" data-id="${h(f.id)}" data-filename="${h(f.name||'artifact')}">${icon('download',13)}Download</button>`]),'No artifacts available.')}</div></section>
@@ -100,7 +100,7 @@ function userPolicies(users,hubLimit) {
           <option value="true" ${user.disabled?'selected':''}>Disabled</option>
         </select></label>
         <label>Runtime override (seconds)<input type="number" name="runtime" min="1" max="${h(hubLimit)}" step="1" value="${h(override)}" placeholder="Use hub limit">
-          <small>Leave empty to use the hub limit of ${h(hubLimit)} seconds.</small></label>
+          <small>Leave blank to use the hub limit of ${h(hubLimit)} seconds.</small></label>
         <button class="btn small secondary" type="submit">Save policy</button><span role="status" class="policy-status"></span>
       </form></details>`:'';
     return [h(user.alias),h(label(user.role)),h(user.disabled?'Disabled':'Enabled'),h(effective+' s'),edit];
@@ -118,13 +118,13 @@ export function adminPage(nodes,selected,evidence,policy,system) {
     const entries=Array.isArray(caps)?caps.map(v=>[v.name||v.id,v]):Object.entries(caps);
     body=`<div class="panel padded"><div class="section-heading"><div><h2>${h(n.name)}</h2><p class="subtle">${h(n.id)}</p></div>${controls}</div>
       ${stats([['Administrative state',state],['Qualification',label(n.qualification_status)],['Last heartbeat',date(n.heartbeat_at)],['Resource model',profiles[n.backend]||label(n.backend)],['Host reserve',bytes(n.reserve_bytes)],['Pressure',n.metrics?.memory_pressure||'Unavailable'],['Storage available',bytes(n.metrics?.disk_available_bytes)]])}</div>
-      <section>${section('Qualification evidence')}<div class="panel">${table(['Capability','Status'],entries.map(([k,v])=>[h(label(k)),badge(typeof v==='string'?v:v?.status||'Unknown')]),'No verified capability evidence has been recorded.')}
+      <section>${section('Qualification evidence')}<div class="panel">${table(['Capability','Status'],entries.map(([k,v])=>[h(label(k)),badge(typeof v==='string'?v:v?.status||'Unknown')]),'No qualification results yet.')}
       <details class="raw"><summary>Inspect full evidence</summary><pre>${h(JSON.stringify(evidence,null,2))}</pre></details></div></section>`;
   }
-  return head('Node administration','Review worker qualification and manage admissions.')+
+  return head('Node administration')+
     '<div class="tabs">'+choose+'</div>'+body+'<section>'+section('Active reservations','',system.reservations.length)+'<div class="panel">'+
     table(['Worker','Slot','Owner','Attempt'],system.reservations.map(r=>[h(r.node_id),h(r.slot),h(alias(r.user_id)),h(r.attempt_id)]),'No active reservations.')+'</div></section>'+
-    '<section>'+section('Student policies','',system.users.filter(u=>u.role==='student').length)+'<p class="policy-note">Runtime changes apply to new submissions and resumes. Disabling a student pauses queued work. Running attempts keep their limits.</p><div class="panel">'+userPolicies(system.users,policy.hub_runtime_max_seconds ?? policy.runtime_max_seconds)+'</div></section>'+
+    '<section>'+section('Student policies','',system.users.filter(u=>u.role==='student').length)+'<p class="policy-note">New runtime limits apply when a student submits or resumes a job. Disable access to hold their queued jobs.</p><div class="panel">'+userPolicies(system.users,policy.hub_runtime_max_seconds ?? policy.runtime_max_seconds)+'</div></section>'+
     '<section>'+section('Administrative events')+'<div class="panel">'+table(['Time','Action','Details'],system.audit.map(v=>[h(date(v.at)),h(label(v.kind)),h(v.message)]),'No administrative events recorded.')+'</div></section>'+
     '<section>'+section('Effective policy')+'<div class="panel"><details class="raw"><summary>View policy settings and quotas</summary><pre>'+h(JSON.stringify(policy,null,2))+'</pre></details></div></section>';
 }
