@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "name": "Linear fit",
+  "environment": "python-cpu-v1",
+  "entrypoint": "train.py",
+  "runtime_seconds": 120
+}

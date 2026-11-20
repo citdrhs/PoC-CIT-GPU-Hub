@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cit-gpu-hub"
+version = "0.1.0"
+description = "CIT fixed half-capacity job scheduler and local development console"
+requires-python = ">=3.11"
+dependencies = ["fastapi==0.141.1", "pydantic==2.13.4", "uvicorn==0.52.4"]
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1", "httpx==0.28.1", "PyYAML==6.0.3"]
+cli = ["keyring==25.6.0", "PyYAML==6.0.3"]
+
+[project.scripts]
+gpuhub = "apps.cli.main:main"
+
+[tool.setuptools.packages.find]
+include = ["apps*", "services*", "packages*", "deploy"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+"services.scheduler" = ["migrations/*.sql"]
+"apps.web" = ["index.html", "assets/*"]
+"deploy" = ["examples/Dockerfile"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
